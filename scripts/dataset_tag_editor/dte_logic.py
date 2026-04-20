@@ -1,39 +1,40 @@
-from pathlib import Path
-import re, sys
-from typing import Optional, Iterable
-from enum import Enum
-from PIL import ImageFile
-ImageFile.LOAD_TRUNCATED_IMAGES = True
-
-from PIL import Image
-import traceback
-from multiprocessing import Pool
-
-from tqdm import tqdm
-
-from singleton import Singleton
-import settings, logger, utilities
-from paths import paths
-sys.path = [str(paths.base_path)] + sys.path
-
+import utilities
+import logger
+import settings
+from cmd_args import opts
+from tagger import Tagger
+from tokenizer import clip_tokenizer
+from .interrigator_names import BLIP2_CAPTIONING_NAMES, WD_TAGGERS, WD_TAGGERS_TIMM
+from .custom_scripts import CustomScripts
 from . import (
     filters,
     dataset as ds,
     kohya_finetune_metadata as kohya_metadata,
     taggers_builtin
 )
-from .custom_scripts import CustomScripts
-from .interrigator_names import BLIP2_CAPTIONING_NAMES, WD_TAGGERS, WD_TAGGERS_TIMM
-from scripts.tokenizer import clip_tokenizer
-from scripts.tagger import Tagger
-from cmd_args import opts
+from paths import paths
+from singleton import Singleton
+from tqdm import tqdm
+from multiprocessing import Pool
+import traceback
+from PIL import Image
+from pathlib import Path
+import re
+import sys
+from typing import Optional, Iterable
+from enum import Enum
+from PIL import ImageFile
+ImageFile.LOAD_TRUNCATED_IMAGES = True
+
+
+sys.path = [str(paths.base_path)] + sys.path
+
 
 re_tags = re.compile(r"^([\s\S]+?)( \[\d+\])?$")
 re_newlines = re.compile(r"[\r\n]+")
 re_numbers_at_start = re.compile(r"^[-\d]+\s*")
 
-
-def get_square_rgb(data:Image.Image):
+def get_square_rgb(data: Image.Image):
     data = utilities.get_rgb_image(data)
     max_size = max(data.size)
     data = utilities.resize_and_fill(data, (max_size, max_size), repeat_edge=False)
@@ -51,7 +52,7 @@ def load_image(img_path: Path, max_res: float, use_temp_dir: bool):
 
 def load_image_wrapper(args):
     return load_image(*args)
-     
+
 
 class DatasetTagEditor(Singleton):
     class SortBy(Enum):
@@ -70,7 +71,7 @@ class DatasetTagEditor(Singleton):
         OVERWRITE = 2
         PREPEND = 3
         APPEND = 4
-    
+
     def __init__(self):
         # from modules.textual_inversion.dataset
         self.re_word = (
@@ -85,13 +86,13 @@ class DatasetTagEditor(Singleton):
         self.images = {}
         self.tag_tokens = {}
         self.raw_clip_token_used = None
-        
+
     def load_interrogators(self):
         custom_tagger_scripts = CustomScripts(paths.userscript_path / "taggers")
-        custom_taggers:list[Tagger] = custom_tagger_scripts.load_derived_classes(Tagger)
+        custom_taggers: list[type[Tagger]] = custom_tagger_scripts.load_derived_classes(Tagger)
         logger.write(f"Custom taggers loaded: {[tagger().name() for tagger in custom_taggers]}")
 
-        def read_wd_batchsize(name:str):
+        def read_wd_batchsize(name: str):
             if "vit-large" in name:
                 return settings.current.batch_size_vit_large
             elif "vit" in name:
@@ -102,6 +103,7 @@ class DatasetTagEditor(Singleton):
                 return settings.current.batch_size_swinv2
             elif "eva02-large" in name:
                 return settings.current.batch_size_eva02_large
+            return 1
 
         self.INTERROGATORS = (
             [taggers_builtin.BLIP()]
@@ -113,14 +115,15 @@ class DatasetTagEditor(Singleton):
                 for name, threshold in WD_TAGGERS.items()
             ]
             + [
-                taggers_builtin.WaifuDiffusionTimm(name, threshold, settings.current.tagger_use_rating, read_wd_batchsize(name))
+                taggers_builtin.WaifuDiffusionTimm(
+                    name, threshold, settings.current.tagger_use_rating, read_wd_batchsize(name))
                 for name, threshold in WD_TAGGERS_TIMM.items()
             ]
             + [taggers_builtin.Z3D_E621()]
             + [cls_tagger() for cls_tagger in custom_taggers]
         )
         self.INTERROGATOR_NAMES = [it.name() for it in self.INTERROGATORS]
-    
+
     def interrogate_image(self, path: str, interrogator_name: str, threshold_booru, threshold_wd, threshold_z3d):
         try:
             img = Image.open(path)
@@ -128,6 +131,7 @@ class DatasetTagEditor(Singleton):
         except:
             return ""
         else:
+            res = []
             for it in self.INTERROGATORS:
                 if it.name() == interrogator_name:
                     if isinstance(it, taggers_builtin.DeepDanbooru):
@@ -141,7 +145,9 @@ class DatasetTagEditor(Singleton):
                             res = tg.predict(img, threshold_z3d)
                     else:
                         with it as cap:
-                            res = cap.predict(img)
+                            res = cap.predict(img)  # type: ignore
+            if not res:
+                return ""
             return ", ".join(res)
 
     def get_tag_list(self):
@@ -183,8 +189,14 @@ class DatasetTagEditor(Singleton):
 
     def read_tags(self, tags: list[str]):
         if tags:
-            tags = [re_tags.match(tag).group(1) for tag in tags if tag]
-            return [t for t in tags if t]
+            parsed_tags = []
+            for tag in tags:
+                if not tag:
+                    continue
+                m = re_tags.match(tag)
+                if m:
+                    parsed_tags.append(m.group(1))
+            return [t for t in parsed_tags if t]
         else:
             return []
 
@@ -331,13 +343,13 @@ class DatasetTagEditor(Singleton):
     def replace_tags(
         self,
         search_tags: list[str],
-        replace_tags: list[str],
+        replace_tags: list[Optional[str]],
         filters: list[filters.Filter] = [],
         prepend: bool = False,
     ):
         img_paths = self.get_filtered_imgpaths(filters=filters)
-        tags_to_append = replace_tags[len(search_tags) :]
-        tags_to_remove = search_tags[len(replace_tags) :]
+        tags_to_append = [t for t in replace_tags[len(search_tags):] if t]
+        tags_to_remove = search_tags[len(replace_tags):]
         tags_to_replace = {}
         for i in range(min(len(search_tags), len(replace_tags))):
             if replace_tags[i] is None or replace_tags[i] == "":
@@ -351,22 +363,18 @@ class DatasetTagEditor(Singleton):
                 if t not in tags_to_remove
             ]
             tags_replaced = [
-                tags_to_replace.get(t) if t in tags_to_replace.keys() else t
+                tags_to_replace[t] if t in tags_to_replace else t
                 for t in tags_removed
             ]
-            self.set_tags_by_image_path(
-                img_path,
-                tags_to_append + tags_replaced
-                if prepend
-                else tags_replaced + tags_to_append,
-            )
+            merged_tags = tags_to_append + tags_replaced if prepend else tags_replaced + tags_to_append
+            self.set_tags_by_image_path(img_path, merged_tags)
 
         self.construct_tag_infos()
 
     def get_replaced_tagset(
-        self, tags: set[str], search_tags: list[str], replace_tags: list[str]
+        self, tags: set[str], search_tags: list[str], replace_tags: list[Optional[str]]
     ):
-        tags_to_remove = search_tags[len(replace_tags) :]
+        tags_to_remove = search_tags[len(replace_tags):]
         tags_to_replace = {}
         for i in range(min(len(search_tags), len(replace_tags))):
             if replace_tags[i] is None or replace_tags[i] == "":
@@ -502,8 +510,14 @@ class DatasetTagEditor(Singleton):
             tags = self.dataset.get_data_tags(path)
             res = self.sort_tags(tags, **sort_args)
             self.set_tags_by_image_path(path, res)
+        sort_by = sort_args.get("sort_by", self.SortBy.ALPHA)
+        sort_order = sort_args.get("sort_order", self.SortOrder.ASC)
+        if isinstance(sort_by, str):
+            sort_by = self.SortBy(sort_by)
+        if isinstance(sort_order, str):
+            sort_order = self.SortOrder(sort_order)
         logger.write(
-            f'Tags are sorted by {sort_args.get("sort_by").value} ({sort_args.get("sort_order").value})'
+            f'Tags are sorted by {sort_by.value} ({sort_order.value})'
         )
 
     def truncate_filtered_tags_by_token_count(
@@ -685,17 +699,23 @@ class DatasetTagEditor(Singleton):
         threshold_waifu: float,
         threshold_z3d: float,
         use_temp_dir: bool,
-        kohya_json_path: Optional[str], 
-        max_res:float
+        kohya_json_path: Optional[str],
+        max_res: float
     ):
         import time
+        start_ns = None
+        epoch_ns = None
         if opts.profile:
             start_ns = time.time_ns()
             epoch_ns = time.time_ns()
-        def timestamp(epoch:int, text:str):
+        else:
+            start_ns = 0
+            epoch_ns = 0
+
+        def timestamp(epoch: int, text: str):
             elapsed = time.time_ns() - epoch
             logger.profile(f"{text} : {elapsed/1000000:.3f} [ms]")
-        
+
         self.clear()
 
         img_dir_obj = Path(img_dir)
@@ -714,20 +734,21 @@ class DatasetTagEditor(Singleton):
             logger.write("Loading Aborted.")
             self.clear()
             return
-        
+
         self.dataset_dir = img_dir
-        
+
         if opts.profile:
             timestamp(epoch_ns, "List files to read")
             epoch_ns = time.time_ns()
-        
+
         pool_size = settings.current.num_cpu_worker
         if pool_size < 0:
-            import os, math
+            import os
+            import math
             # maybe a good approximation of the optimal number of CPU processes
             pool_size = round(3.5*math.log(estimated_image_num)-12.65) if estimated_image_num > 0 else 1
             pool_size = max(pool_size, 1)
-            pool_size = min(pool_size, os.cpu_count() + 1)
+            pool_size = min(pool_size, (os.cpu_count() or 1) + 1)
             logger.write(f"Auto-tuned CPU process count = {pool_size}")
         process_pool = Pool(pool_size)
 
@@ -749,12 +770,12 @@ class DatasetTagEditor(Singleton):
             for img_path, img in result:
                 imgpaths.append(img_path)
                 if not use_temp_dir and max_res <= 0:
-                    img.already_saved_as = img_path
+                    setattr(img, "already_saved_as", img_path)
                 images_raw[img_path] = img
-            
+
             logger.write(f"Total {len(imgpaths)} valid images")
             return imgpaths, images_raw
-        
+
         def load_thumbnails(images_raw: dict[str, Image.Image]):
             images = {}
             if max_res > 0:
@@ -765,7 +786,7 @@ class DatasetTagEditor(Singleton):
             else:
                 for img_path, img in images_raw.items():
                     if not use_temp_dir:
-                        img.already_saved_as = img_path
+                        setattr(img, "already_saved_as", img_path)
                     images[img_path] = img
             return images
 
@@ -797,8 +818,8 @@ class DatasetTagEditor(Singleton):
                 taglists.append(caption_tags)
 
             return taglists
-        
-        tagger_thresholds:list[tuple[Tagger, float]] = []
+
+        tagger_thresholds: list[tuple[Tagger, Optional[float]]] = []
         if interrogate_method != self.InterrogateMethod.NONE:
             for it in self.INTERROGATORS:
                 if it.name() in interrogator_names:
@@ -825,20 +846,21 @@ class DatasetTagEditor(Singleton):
             logger.write("Loading Aborted.")
             self.clear()
             return
-        
+
         if opts.profile:
             timestamp(epoch_ns, "Load dataset and convert images")
             epoch_ns = time.time_ns()
-        
-        interrogate_tags = {img_path : [] for img_path in imgpaths}
-        
+
+        interrogate_tags = {img_path: [] for img_path in imgpaths}
+
         img_to_interrogate = [
-        img_path for i, img_path in enumerate(imgpaths) 
+            img_path for i, img_path in enumerate(imgpaths)
             if (not taglists[i] or interrogate_method != self.InterrogateMethod.PREFILL)
         ]
 
         if interrogate_method != self.InterrogateMethod.NONE and img_to_interrogate:
             logger.write("Preprocessing images...")
+
             def gen_data():
                 for img_path in img_to_interrogate:
                     yield images_raw[img_path]
@@ -854,14 +876,14 @@ class DatasetTagEditor(Singleton):
             if opts.profile:
                 timestamp(epoch_ns, "Preprocess images for interrogating")
                 epoch_ns = time.time_ns()
-            
+
             logger.write("Interrogating images...")
             for tg, th in tqdm(tagger_thresholds):
                 use_pipe = True
                 tg.start()
 
                 try:
-                    tg.predict_pipe(None)
+                    tg.predict_pipe([])  # type: ignore
                 except NotImplementedError:
                     use_pipe = False
                 except Exception as e:
@@ -880,11 +902,11 @@ class DatasetTagEditor(Singleton):
                     logger.error(e)
                 finally:
                     tg.stop()
-        
+
         if opts.profile:
             timestamp(epoch_ns, "Interrogate images")
             epoch_ns = time.time_ns()
-        
+
         for img_path, tags in zip(imgpaths, taglists):
             if (interrogate_method == self.InterrogateMethod.PREFILL and not tags) or (interrogate_method == self.InterrogateMethod.OVERWRITE):
                 tags = interrogate_tags[img_path]
@@ -897,21 +919,19 @@ class DatasetTagEditor(Singleton):
 
         for i, path in enumerate(sorted(self.dataset.datas.keys())):
             self.img_idx[path] = i
-        
+
         if opts.profile:
             timestamp(epoch_ns, "Store image tags")
             epoch_ns = time.time_ns()
 
         self.construct_tag_infos()
-        
+
         if opts.profile:
             timestamp(epoch_ns, "Analyze image tags")
-        
+
         logger.write(f"Loading Completed: {len(self.dataset)} images found")
         if opts.profile:
             timestamp(start_ns, "Total elapsed time")
-
-
 
     def save_dataset(
         self,
@@ -934,12 +954,12 @@ class DatasetTagEditor(Singleton):
             txt_path = img_path.with_suffix(caption_ext)
             # make backup
             if backup and txt_path.is_file():
+                bak_path = None
                 for extnum in range(1000):
-                    bak_path = img_path.with_suffix(f".{extnum:0>3d}")
-                    if not bak_path.is_file():
+                    candidate = img_path.with_suffix(f".{extnum:0>3d}")
+                    if not candidate.is_file():
+                        bak_path = candidate
                         break
-                    else:
-                        bak_path = None
                 if bak_path is None:
                     logger.write(
                         f"There are too many backup files with same filename. A backup file of {txt_path} cannot be created."

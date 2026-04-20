@@ -3,7 +3,8 @@ import os
 import subprocess
 import sys
 
-import cmd_args, logger
+import cmd_args
+import logger
 
 
 # ================================================================
@@ -20,10 +21,10 @@ def check_python_version():
     if not (major == 3 and minor >= 9):
         logger.error(
             f"""
-INCOMPATIBLE PYTHON VERSION
+            INCOMPATIBLE PYTHON VERSION
 
-This program is aimed to work on Python >=3.9 (developed with 3.10.11), but you have {major}.{minor}.{micro}.
-"""
+            This program is aimed to work on Python >=3.9 (developed with 3.10.11), but you have {major}.{minor}.{micro}.
+            """
         )
 
 
@@ -54,12 +55,12 @@ def run_pip(args, desc=None):
     result = run(command)
     if result.returncode != 0:
         message = f"""
-Couldn't Install {desc}.
-Command: {command}
-Error code: {result.returncode}
-stdout: {result.stdout.decode(encoding="utf8", errors="ignore") if len(result.stdout)>0 else '<empty>'}
-stderr: {result.stderr.decode(encoding="utf8", errors="ignore") if len(result.stderr)>0 else '<empty>'}
-"""
+                    Couldn't Install {desc}.
+                    Command: {command}
+                    Error code: {result.returncode}
+                    stdout: {result.stdout.decode(encoding="utf8", errors="ignore") if len(result.stdout) > 0 else '<empty>'}
+                    stderr: {result.stderr.decode(encoding="utf8", errors="ignore") if len(result.stderr) > 0 else '<empty>'}
+                    """
         raise RuntimeError(message)
 
 

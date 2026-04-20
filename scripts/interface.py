@@ -6,16 +6,22 @@ import signal
 import sys
 import time
 import tempfile
+from typing import Any
 
 from PIL import PngImagePlugin, Image
 
 import gradio as gr
 import gradio.routes
-import gradio.utils
 
 from dte_instance import dte_instance
 
-import tab_main, tab_settings, cmd_args, utilities, logger, launch, settings
+import tab_main
+import tab_settings
+import cmd_args
+import utilities
+import logger
+import launch
+import settings
 import paths
 from shared_state import state
 
@@ -28,7 +34,9 @@ mimetypes.init()
 mimetypes.add_type("application/javascript", ".js")
 
 Savedfile = namedtuple("Savedfile", ["name"])
-GradioTemplateResponseOriginal = gradio.routes.templates.TemplateResponse
+GradioTemplateResponseOriginal: Any = None
+if hasattr(gradio.routes, "templates") and hasattr(gradio.routes.templates, "TemplateResponse"):
+    GradioTemplateResponseOriginal = gradio.routes.templates.TemplateResponse
 git = "git"
 stored_commit_hash = None
 interface = None
@@ -53,9 +61,10 @@ def register_tmp_file(gradio: gr.Blocks, filename):
 def save_pil_to_cache(pil_image: Image.Image, *args, **kwargs):
     already_saved_as = getattr(pil_image, "already_saved_as", None)
     if already_saved_as and os.path.isfile(already_saved_as):
-        register_tmp_file(interface, already_saved_as)
+        if interface:
+            register_tmp_file(interface, already_saved_as)
         return str(Path(already_saved_as).resolve())
-    
+
     tmpdir = state.temp_dir
     use_metadata = False
     metadata = PngImagePlugin.PngInfo()
@@ -67,13 +76,14 @@ def save_pil_to_cache(pil_image: Image.Image, *args, **kwargs):
     if tmpdir:
         if not tmpdir.is_dir():
             tmpdir.mkdir(parents=True)
-        file_obj = tempfile.NamedTemporaryFile(delete=False, suffix=".png", dir=tmpdir)
+        file_obj = tempfile.NamedTemporaryFile(
+            delete=False, suffix=".png", dir=tmpdir)
     else:
         file_obj = tempfile.NamedTemporaryFile(delete=False, suffix=".png")
     pil_image.save(file_obj, pnginfo=(metadata if use_metadata else None))
 
-    pil_image.already_saved_as = file_obj.name
-    
+    setattr(pil_image, "already_saved_as", file_obj.name)
+
     return file_obj.name
 
 
@@ -85,10 +95,10 @@ def save_file_to_cache_cacheonce(file_path: str | Path, cache_dir: str) -> str:
     """Returns a temporary file path for a copy of the given file path if it does
     not already exist. Otherwise returns the path to the existing temp file."""
     import hashlib
-    filename = hashlib.md5(file_path.encode()).hexdigest()
+    filename = hashlib.md5(str(file_path).encode()).hexdigest()
     temp_dir = Path(cache_dir)
     temp_dir.mkdir(exist_ok=True, parents=True)
-    
+
     from gradio_client import utils as client_utils
     import shutil
 
@@ -133,10 +143,19 @@ def reload_javascript():
     js = javascript_html()
     css = css_html()
 
+    if GradioTemplateResponseOriginal is None:
+        return
+
+    original_template_response = GradioTemplateResponseOriginal
+
     def template_response(*args, **kwargs):
-        res = GradioTemplateResponseOriginal(*args, **kwargs)
-        res.body = res.body.replace(b"</head>", f"{js}</head>".encode("utf8"))
-        res.body = res.body.replace(b"</body>", f"{css}</body>".encode("utf8"))
+        res = original_template_response(*args, **kwargs)
+        body_bytes = bytes(res.body)
+        body_bytes = body_bytes.replace(
+            b"</head>", f"{js}</head>".encode("utf8"))
+        body_bytes = body_bytes.replace(
+            b"</body>", f"{css}</body>".encode("utf8"))
+        res.body = body_bytes
         res.init_headers()
         return res
 
@@ -167,14 +186,14 @@ def versions_html():
     short_commit = commit[0:8]
 
     return f"""
-python: <span title="{sys.version}">{python_version}</span>
- • 
-torch: {getattr(torch, '__long_version__',torch.__version__)}
- • 
-gradio: {gr.__version__}
- • 
-commit: <a href="https://github.com/toshiaki1729/dataset-tag-editor-standalone/commit/{commit}">{short_commit}</a>
-"""
+            python: <span title="{sys.version}">{python_version}</span>
+            ...
+            torch: {getattr(torch, '__long_version__', torch.__version__)}
+            ...
+            gradio: {gr.__version__}
+            ...
+            commit: <a href="https://github.com/PineCookie/dataset-tag-editor-standalone/commit/{commit}">{short_commit}</a>
+            """
 
 
 def create_ui():
@@ -220,23 +239,25 @@ def main():
 
     while True:
         state.begin()
-        
+
         settings.load()
         paths.paths = paths.Paths()
 
         state.temp_dir = (utilities.base_dir_path() / "temp").absolute()
         if settings.current.use_temp_files and settings.current.temp_directory != "":
             state.temp_dir = Path(settings.current.temp_directory)
-        
+
         os.environ['GRADIO_TEMP_DIR'] = state.temp_dir.name
-        
-        # override save function to prevent from making anonying temporaly files
-        gr.gradio.processing_utils.save_pil_to_cache = save_pil_to_cache
+
+        # override save function to prevent from making annoying temporary files
+        import gradio.processing_utils as gr_processing_utils
+
+        gr_processing_utils.save_pil_to_cache = save_pil_to_cache
 
         if settings.current.use_temp_files:
-            gr.gradio.processing_utils.save_file_to_cache = save_file_to_cache_cacheonce
+            gr_processing_utils.save_file_to_cache = save_file_to_cache_cacheonce
         else:
-            gr.gradio.processing_utils.save_file_to_cache = save_file_to_cache_nocache
+            gr_processing_utils.save_file_to_cache = save_file_to_cache_nocache
 
         if settings.current.cleanup_tmpdir:
             cleanup_tmpdr()
@@ -246,8 +267,10 @@ def main():
         interface = create_ui().queue(64)
 
         allowed_paths = settings.current.allowed_paths.split(', ')
-        allowed_paths = [str(Path(path).absolute()) for path in allowed_paths] + [utilities.base_dir_path()]
-        app, _, _ = interface.launch(
+        allowed_paths = [str(Path(path).absolute())
+                         for path in allowed_paths] + [str(utilities.base_dir_path())]
+        result = interface.launch(
+            theme=gr.themes.Base(),
             server_port=cmd_args.opts.port,
             server_name=cmd_args.opts.server_name,
             share=cmd_args.opts.share,
@@ -261,10 +284,13 @@ def main():
             allowed_paths=allowed_paths
         )
 
+        app = result[0] if isinstance(result, tuple) and result else result
+
         # Disable a very open middleware as Stable Diffusion web UI does
-        app.user_middleware = [
-            x for x in app.user_middleware if x.cls.__name__ != "CORSMiddleware"
-        ]
+        if hasattr(app, "user_middleware"):
+            app.user_middleware = [
+                x for x in app.user_middleware if getattr(x.cls, "__name__", "") != "CORSMiddleware"
+            ]
 
         wait_on_server()
         logger.write("Restarting UI...")
