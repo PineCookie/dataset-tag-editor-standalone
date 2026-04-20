@@ -197,6 +197,7 @@ class LoadDatasetUI(UIBase):
                 [[], []]
                 + filter_by_tags.clear_filters()
                 + [tag_select_update]
+                + update_filter_and_gallery()
             )
 
         self.btn_unload_datasets.click(
@@ -207,7 +208,5 @@ class LoadDatasetUI(UIBase):
             ]
             + filter_by_tags.clear_filters_output()
             + [batch_edit_captions.tag_select_ui_remove.cbg_tags]
-        ).then(
-            fn=lambda: update_filter_and_gallery(),
-            outputs=o_update_filter_and_gallery
+            + o_update_filter_and_gallery
         )

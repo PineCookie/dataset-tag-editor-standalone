@@ -136,7 +136,7 @@ class BatchEditCaptionsUI(UIBase):
         update_filter_and_gallery: Callable[[], list],
     ):
         load_dataset.btn_load_datasets.click(
-            fn=lambda: ["", ""], outputs=[self.tb_common_tags, self.tb_edit_tags]
+            fn=lambda: self.get_common_tags(get_filters, filter_by_tags), outputs=[self.tb_common_tags, self.tb_edit_tags]
         )
 
         def apply_edit_tags(search_tags_str: str, replace_tags_str: str, prepend: bool):
