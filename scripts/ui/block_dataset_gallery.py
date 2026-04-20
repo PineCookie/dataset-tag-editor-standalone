@@ -34,7 +34,5 @@ class DatasetGalleryUI(UIBase):
                 self.selected_index = -1
                 self.selected_path = ""
             gallery_state.register_value("Selected Image", self.selected_path)
-        
-        self.gl_dataset_images.select(gl_dataset_images_on_change)
 
-    
+        self.gl_dataset_images.select(gl_dataset_images_on_change)

@@ -1,5 +1,5 @@
 from __future__ import annotations
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Optional
 import gradio as gr
 
 from .ui_common import *
@@ -70,7 +70,7 @@ class ToprowUI(UIBase):
             backup: bool,
             save_kohya_metadata: bool,
             metadata_output: str,
-            metadata_input: str,
+            metadata_input: Optional[str],
             metadata_overwrite: bool,
             metadata_as_caption: bool,
             metadata_use_fullpath: bool,

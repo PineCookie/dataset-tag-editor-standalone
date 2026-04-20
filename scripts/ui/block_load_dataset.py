@@ -57,10 +57,13 @@ class LoadDatasetUI(UIBase):
                             value=cfg_general.use_interrogator,
                             label="Use Interrogator Caption",
                         )
+                        # Validate interrogator names are in available choices
+                        available_names = set(dte_instance.INTERROGATOR_NAMES)
+                        valid_names = [n for n in cfg_general.use_interrogator_names if n in available_names] if cfg_general.use_interrogator_names else []
                         self.dd_intterogator_names = gr.Dropdown(
                             label="Interrogators",
                             choices=dte_instance.INTERROGATOR_NAMES,
-                            value=cfg_general.use_interrogator_names,
+                            value=valid_names,
                             interactive=True,
                             multiselect=True,
                         )
@@ -100,7 +103,7 @@ class LoadDatasetUI(UIBase):
 
     def set_callbacks(
         self,
-        o_update_filter_and_gallery: list[gr.components.Component],
+        o_update_filter_and_gallery: list[gr.Component],
         toprow: ToprowUI,
         dataset_gallery: DatasetGalleryUI,
         filter_by_tags: FilterByTagsUI,
@@ -184,10 +187,16 @@ class LoadDatasetUI(UIBase):
 
         def unload_files():
             dte_instance.clear()
+            try:
+                tag_select_update = batch_edit_captions.tag_select_ui_remove.cbg_tags_update()
+            except Exception:
+                # If there's an error updating after clear, provide a safe default
+                tag_select_update = gr.update(value=[], choices=[])
+            
             return (
                 [[], []]
                 + filter_by_tags.clear_filters()
-                + [batch_edit_captions.tag_select_ui_remove.cbg_tags_update()]
+                + [tag_select_update]
             )
 
         self.btn_unload_datasets.click(
@@ -199,6 +208,6 @@ class LoadDatasetUI(UIBase):
             + filter_by_tags.clear_filters_output()
             + [batch_edit_captions.tag_select_ui_remove.cbg_tags]
         ).then(
-            fn=lambda:update_filter_and_gallery(),
+            fn=lambda: update_filter_and_gallery(),
             outputs=o_update_filter_and_gallery
         )

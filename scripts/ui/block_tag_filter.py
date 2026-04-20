@@ -85,11 +85,11 @@ class TagFilterUI:
             label="Filter Logic",
             interactive=True,
         )
-        
+
         with gr.Row():
             self.btn_select_visibles = gr.Button(value="Select visible tags")
             self.btn_deselect_visibles = gr.Button(value="Deselect visible tags")
-            
+
         self.cbg_tags = gr.CheckboxGroup(
             label="Filter Images by Tags", interactive=True
         )
@@ -130,7 +130,7 @@ class TagFilterUI:
             fn=self.rd_logic_changed, inputs=[self.rb_logic], outputs=o_update
         )
         for fn, inputs, outputs, js in self.after_filter_update_callbacks:
-            self.rb_logic.change(fn=lambda:None).then(fn=fn, inputs=inputs, outputs=outputs, js=js)
+            self.rb_logic.change(fn=lambda: None).then(fn=fn, inputs=inputs, outputs=outputs, js=js)
 
         self.btn_select_visibles.click(
             fn=self.btn_select_visibles_clicked, outputs=o_update
@@ -145,7 +145,7 @@ class TagFilterUI:
             fn=self.cbg_tags_changed, inputs=self.cbg_tags, outputs=o_update
         )
         for fn, inputs, outputs, js in self.after_filter_update_callbacks:
-            self.cbg_tags.change(fn=lambda:None).then(fn=fn, inputs=inputs, outputs=outputs, js=js)
+            self.cbg_tags.change(fn=lambda: None).then(fn=fn, inputs=inputs, outputs=outputs, js=js)
 
     def tb_search_tags_changed(self, tb_search_tags: str):
         self.filter_word = tb_search_tags
@@ -163,11 +163,11 @@ class TagFilterUI:
         return self.cbg_tags_update()
 
     def rd_sort_by_changed(self, rb_sort_by: str):
-        self.sort_by = rb_sort_by
+        self.sort_by = SortBy(rb_sort_by)
         return self.cbg_tags_update()
 
     def rd_sort_order_changed(self, rd_sort_order: str):
-        self.sort_order = rd_sort_order
+        self.sort_order = SortOrder(rd_sort_order)
         return self.cbg_tags_update()
 
     def rd_logic_changed(self, rd_logic: str):
@@ -180,7 +180,7 @@ class TagFilterUI:
         )
         self.filter = TagFilter(self.selected_tags, self.logic, self.filter_mode)
         return self.cbg_tags_update()
-    
+
     def btn_deselect_visibles_clicked(self, cbg_tags: list[str]):
         selected_tags = set(dte_instance.read_tags(cbg_tags))
         self.selected_tags -= selected_tags
@@ -220,8 +220,7 @@ class TagFilterUI:
                 suffix=self.suffix,
                 regex=self.regex,
             )
-        
-        
+
         tags_in_filter = set()
         if self.filter_word:
             # Show only tags with the search words for better use
@@ -230,30 +229,50 @@ class TagFilterUI:
                     tags_in_filter.add(tag)
         else:
             tags_in_filter = self.filter.tags
-        
+
         tags -= tags_in_filter
 
-        tags = dte_instance.sort_tags(
+        sorted_tags = dte_instance.sort_tags(
             tags=tags, sort_by=self.sort_by, sort_order=self.sort_order
         )
-        tags_in_filter = dte_instance.sort_tags(
+        sorted_tags_in_filter = dte_instance.sort_tags(
             tags=tags_in_filter, sort_by=self.sort_by, sort_order=self.sort_order
         )
-
-        tags = tags_in_filter + tags
         
-        self.visible_tags = set(tags)
+        # Ensure both are lists
+        sorted_tags = list(sorted_tags) if sorted_tags else []
+        sorted_tags_in_filter = list(sorted_tags_in_filter) if sorted_tags_in_filter else []
         
-        tags = dte_instance.write_tags(tags, self.sort_by)
-        tags_in_filter = dte_instance.write_tags(tags_in_filter, self.sort_by)
+        # Combine lists
+        combined_tags = sorted_tags_in_filter + sorted_tags
 
-        return gr.CheckboxGroup(value=tags_in_filter, choices=tags)
+        self.visible_tags = set(combined_tags)
+
+        formatted_choices = dte_instance.write_tags(combined_tags, self.sort_by)
+        formatted_filter = dte_instance.write_tags(sorted_tags_in_filter, self.sort_by)
+        
+        # Ensure both are lists
+        if formatted_choices is None:
+            formatted_choices = []
+        if formatted_filter is None:
+            formatted_filter = []
+        
+        # Ensure value items are in choices to prevent Gradio validation error
+        choices_set = set(formatted_choices)
+        value = [t for t in formatted_filter if t in choices_set]
+
+        return gr.update(value=value, choices=formatted_choices)
 
     def clear_filter(self):
         self.filter = TagFilter(logic=self.logic, mode=self.filter_mode)
         self.filter_word = ""
         self.selected_tags = set()
-        return [self.cbg_tags_update()] + [self.filter_word]
-    
+        try:
+            cbg_update = self.cbg_tags_update()
+        except Exception:
+            # If there's an error updating after clear, provide a safe default
+            cbg_update = gr.update(value=[], choices=[])
+        return [cbg_update] + [self.filter_word]
+
     def clear_filter_output(self):
         return [self.cbg_tags, self.tb_search_tags]

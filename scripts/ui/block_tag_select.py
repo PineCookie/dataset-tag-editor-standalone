@@ -38,10 +38,10 @@ class TagSelectUI:
 
         self.tb_search_tags = gr.Textbox(label="Search Tags", interactive=True)
         with gr.Row():
-            self.cb_prefix = gr.Checkbox(label="Prefix", value=False, interactive=True)
-            self.cb_suffix = gr.Checkbox(label="Suffix", value=False, interactive=True)
+            self.cb_prefix = gr.Checkbox(label="Prefix", value=prefix, interactive=True)
+            self.cb_suffix = gr.Checkbox(label="Suffix", value=suffix, interactive=True)
             self.cb_regex = gr.Checkbox(
-                label="Use regex", value=False, interactive=True
+                label="Use regex", value=regex, interactive=True
             )
         with gr.Row():
             self.rb_sort_by = gr.Radio(
@@ -114,11 +114,11 @@ class TagSelectUI:
         return self.cbg_tags_update()
 
     def rd_sort_by_changed(self, rb_sort_by: str):
-        self.sort_by = rb_sort_by
+        self.sort_by = SortBy(rb_sort_by)
         return self.cbg_tags_update()
 
     def rd_sort_order_changed(self, rd_sort_order: str):
-        self.sort_order = rd_sort_order
+        self.sort_order = SortOrder(rd_sort_order)
         return self.cbg_tags_update()
 
     def cbg_tags_changed(self, cbg_tags: list[str]):
@@ -159,9 +159,30 @@ class TagSelectUI:
             )
         )
         self.selected_tags &= self.tags
-        tags = dte_instance.sort_tags(
+        
+        # Sort tags - ensure it returns a list
+        sorted_tags = dte_instance.sort_tags(
             tags=tags, sort_by=self.sort_by, sort_order=self.sort_order
         )
-        tags = dte_instance.write_tags(tags, self.sort_by)
-        selected_tags = dte_instance.write_tags(list(self.selected_tags), self.sort_by)
-        return gr.CheckboxGroup(value=selected_tags, choices=tags)
+        
+        # Ensure sorted_tags is a list for write_tags
+        if sorted_tags is None:
+            sorted_tags = []
+        sorted_tags = list(sorted_tags) if sorted_tags else []
+        
+        # Format all tags for display
+        formatted_choices = dte_instance.write_tags(sorted_tags, self.sort_by)
+        if formatted_choices is None:
+            formatted_choices = []
+        
+        # Format selected tags
+        selected_tags_list = list(self.selected_tags) if self.selected_tags else []
+        formatted_selected = dte_instance.write_tags(selected_tags_list, self.sort_by)
+        if formatted_selected is None:
+            formatted_selected = []
+        
+        # Ensure value items are in choices to prevent Gradio validation error
+        choices_set = set(formatted_choices)
+        value = [tag for tag in formatted_selected if tag in choices_set]
+        
+        return gr.update(value=value, choices=formatted_choices)
