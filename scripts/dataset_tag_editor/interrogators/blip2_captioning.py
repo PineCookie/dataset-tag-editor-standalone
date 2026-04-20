@@ -1,3 +1,4 @@
+from typing import Optional
 from transformers import Blip2Processor, Blip2ForConditionalGeneration
 
 import devices, settings, utilities
@@ -7,8 +8,8 @@ from paths import paths
 class BLIP2Captioning:
     def __init__(self, model_repo: str):
         self.MODEL_REPO = model_repo
-        self.processor: Blip2Processor = None
-        self.model: Blip2ForConditionalGeneration = None
+        self.processor: Optional[Blip2Processor] = None
+        self.model: Optional[Blip2ForConditionalGeneration] = None
 
     def load(self):
         if self.model is None or self.processor is None:
@@ -17,7 +18,7 @@ class BLIP2Captioning:
             )
             self.model = Blip2ForConditionalGeneration.from_pretrained(
                 self.MODEL_REPO, cache_dir=paths.models_path / "aesthetic"
-            ).to(devices.device)
+            ).to(devices.device)  # type: ignore
 
     def unload(self):
         if not settings.current.interrogator_keep_in_memory:
@@ -28,6 +29,6 @@ class BLIP2Captioning:
     def apply(self, image):
         if self.model is None or self.processor is None:
             return ""
-        inputs = self.processor(images=image, return_tensors="pt").to(devices.device)
+        inputs = self.processor(images=image, return_tensors="pt").to(devices.device)  # type: ignore
         ids = self.model.generate(**inputs)
         return self.processor.batch_decode(ids, skip_special_tokens=True)

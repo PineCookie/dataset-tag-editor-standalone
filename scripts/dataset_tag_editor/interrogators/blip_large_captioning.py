@@ -1,3 +1,4 @@
+from typing import Optional
 from transformers import BlipProcessor, BlipForConditionalGeneration
 
 import devices, settings
@@ -8,8 +9,8 @@ class BLIPLargeCaptioning:
     MODEL_REPO = "Salesforce/blip-image-captioning-large"
 
     def __init__(self):
-        self.processor: BlipProcessor = None
-        self.model: BlipForConditionalGeneration = None
+        self.processor: Optional[BlipProcessor] = None
+        self.model: Optional[BlipForConditionalGeneration] = None
 
     def load(self):
         if self.model is None or self.processor is None:
@@ -18,7 +19,7 @@ class BLIPLargeCaptioning:
             )
             self.model = BlipForConditionalGeneration.from_pretrained(
                 self.MODEL_REPO, cache_dir=paths.setting_model_path
-            ).to(devices.device)
+            ).to(devices.device)  # type: ignore
 
     def unload(self):
         if not settings.current.interrogator_keep_in_memory:
@@ -29,6 +30,6 @@ class BLIPLargeCaptioning:
     def apply(self, image):
         if self.model is None or self.processor is None:
             return ""
-        inputs = self.processor(images=image, return_tensors="pt").to(devices.device)
+        inputs = self.processor(images=image, return_tensors="pt").to(devices.device)  # type: ignore
         ids = self.model.generate(**inputs)
         return self.processor.batch_decode(ids, skip_special_tokens=True)

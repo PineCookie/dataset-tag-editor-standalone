@@ -1,4 +1,4 @@
-from PIL import Image
+from PIL.Image import Image
 from typing import Optional
 
 from tagger import Tagger, get_replaced_tag
@@ -8,17 +8,17 @@ from .interrogators import BLIPLargeCaptioning, BLIP2Captioning, GITLargeCaption
 class BLIP(Tagger):
     def __init__(self):
         self.interrogator = BLIPLargeCaptioning()
-    
+
     def start(self):
         self.interrogator.load()
 
     def stop(self):
         self.interrogator.unload()
 
-    def predict(self, image:Image, threshold=None):
+    def predict(self, image: Image, threshold=None):
         tags = self.interrogator.apply(image)[0].split(",")
         return [t for t in tags if t]
-    
+
     # def predict_multi(self, images:list):
     #     captions = self.interrogator.apply(images)
     #     return [[t for t in caption.split(',') if t] for caption in captions]
@@ -31,17 +31,17 @@ class BLIP2(Tagger):
     def __init__(self, repo_name):
         self.interrogator = BLIP2Captioning("Salesforce/" + repo_name)
         self.repo_name = repo_name
-    
+
     def start(self):
         self.interrogator.load()
 
     def stop(self):
         self.interrogator.unload()
 
-    def predict(self, image:Image, threshold=None):
+    def predict(self, image: Image, threshold=None):
         tags = self.interrogator.apply(image)[0].split(",")
         return [t for t in tags if t]
-    
+
     # def predict_multi(self, images:list):
     #     captions = self.interrogator.apply(images)
     #     return [[t for t in caption.split(',') if t] for caption in captions]
@@ -60,10 +60,10 @@ class GITLarge(Tagger):
     def stop(self):
         self.interrogator.unload()
 
-    def predict(self, image:Image, threshold=None):
+    def predict(self, image: Image, threshold=None):
         tags = self.interrogator.apply(image)[0].split(",")
         return [t for t in tags if t]
-    
+
     # def predict_multi(self, images:list):
     #     captions = self.interrogator.apply(images)
     #     return [[t for t in caption.split(',') if t] for caption in captions]
@@ -73,7 +73,7 @@ class GITLarge(Tagger):
 
 
 class DeepDanbooru(Tagger):
-    def __init__(self, use_rating = False):
+    def __init__(self, use_rating=False):
         self.tagger_inst = DepDanbooruTagger()
         self.use_rating = use_rating
 
@@ -84,7 +84,7 @@ class DeepDanbooru(Tagger):
     def stop(self):
         self.tagger_inst.unload()
 
-    def predict(self, image: Image.Image, threshold: Optional[float] = None):
+    def predict(self, image: Image, threshold: Optional[float] = None):
         labels = self.tagger_inst.apply(image)
         if not self.use_rating:
             labels = labels[:-3]
@@ -115,7 +115,7 @@ class WaifuDiffusion(Tagger):
 
     # brought from https://huggingface.co/spaces/SmilingWolf/wd-v1-4-tags/blob/main/app.py and modified
     # set threshold<0 to use default value for now...
-    def predict(self, image: Image.Image, threshold: Optional[float] = None):
+    def predict(self, image: Image, threshold: Optional[float] = None):
         # may not use ratings
         # rating = dict(labels[:4])
 
@@ -136,6 +136,7 @@ class WaifuDiffusion(Tagger):
     def name(self):
         return self.repo_name
 
+
 class WaifuDiffusionTimm(Tagger):
     def __init__(self, repo_name, threshold, use_rating=False, batch_size=4):
         self.repo_name = repo_name
@@ -153,7 +154,7 @@ class WaifuDiffusionTimm(Tagger):
 
     # brought from https://huggingface.co/spaces/SmilingWolf/wd-v1-4-tags/blob/main/app.py and modified
     # set threshold<0 to use default value for now...
-    def predict(self, image: Image.Image, threshold: Optional[float] = None):
+    def predict(self, image: Image, threshold: Optional[float] = None):
         labels = self.tagger_inst.apply(image)
         if not self.use_rating:
             labels = labels[4:]
@@ -166,8 +167,8 @@ class WaifuDiffusionTimm(Tagger):
             tags = [get_replaced_tag(tag) for tag, _ in labels]
 
         return tags
-    
-    def predict_pipe(self, data: list[Image.Image], threshold: Optional[float] = None):
+
+    def predict_pipe(self, data: list[Image], threshold: Optional[float] = None):
         for labels_list in self.tagger_inst.apply_multi(data, batch_size=self.batch_size):
             for labels in labels_list:
                 if not self.use_rating:
@@ -199,7 +200,7 @@ class Z3D_E621(Tagger):
 
     # brought from https://huggingface.co/spaces/SmilingWolf/wd-v1-4-tags/blob/main/app.py and modified
     # set threshold<0 to use default value for now...
-    def predict(self, image: Image.Image, threshold: Optional[float] = None):
+    def predict(self, image: Image, threshold: Optional[float] = None):
         # may not use ratings
         # rating = dict(labels[:4])
 

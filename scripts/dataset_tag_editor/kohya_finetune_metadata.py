@@ -69,7 +69,7 @@ def read(dataset_dir, json_path, use_temp_dir: bool):
         else:
             abs_path = str(img_path.absolute())
             if not use_temp_dir:
-                img.already_saved_as = abs_path
+                setattr(img, "already_saved_as", abs_path)
             return abs_path, img
 
     for image_key, img_md in metadata.items():
