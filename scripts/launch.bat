@@ -4,7 +4,7 @@ cd /d %~dp0
 cd ..
 
 set PYTHON=python
-set "VENV_DIR=%cd%\venv"
+set "VENV_DIR=%cd%\.venv"
 
 dir "%VENV_DIR%\Scripts\Python.exe"
 if %ERRORLEVEL% == 0 goto :activate

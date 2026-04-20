@@ -36,17 +36,8 @@ If you want to use DirectML, please install manually in venv  (install [pytorch-
 This script will install [ONNX runtime](https://onnxruntime.ai/) **automatically** in `venv` before using wd-taggers by SmilingWolf.
 
 ## Installation
-### Windows
-Just run `install.bat`  
 
-### Linux (or install manually on Windows)
-Run following commands on the root directory of this repo.
-```sh
-python3 -m venv --system-site-packages venv
-source ./venv/bin/activate
-pip3 install -r requirements.txt
-```
-(Note: just `.\venv\Scripts\activate` is needed to activate venv on Windows)
+You will use `uv` to manage the environment. Run `uv sync -U` to install and update the dependencies.
 
 
 ## Launch

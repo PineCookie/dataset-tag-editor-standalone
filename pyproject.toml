@@ -1,0 +1,41 @@
+[project]
+name = "dataset-tag-editor-standalone"
+version = "0.1.0"
+description = "A standalone version of the dataset tag editor."
+authors = [
+    {name = "", email = ""},
+]
+dependencies = [
+    "gradio==4.28.3",
+    "transformers>=4.27.4",
+    "requests",
+    "pillow",
+    "numpy",
+    "torch>=1.7",
+    "torchvision",
+    "tqdm",
+    "timm>=1.0.8",
+    "print-color",
+    "fastapi==0.112.4",
+    "pydantic==2.10.6",
+    "huggingface-hub<1",
+]
+requires-python = "==3.12.*"
+readme = "README.md"
+license = {text = "MIT"}
+
+[tool.uv.sources]
+torch = [
+  { index = "pytorch" }
+]
+torchvision = [
+  { index = "pytorch" }
+]
+torchaudio = [
+  { index = "pytorch" }
+]
+
+[[tool.uv.index]]
+name = "pytorch"
+url = "https://download.pytorch.org/whl/cu130"
+explicit = true
