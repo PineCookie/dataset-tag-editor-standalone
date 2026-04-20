@@ -95,7 +95,7 @@ class BatchEditCaptionsUI(UIBase):
                 )
                 self.tag_select_ui_remove.create_ui(
                     get_filters,
-                    cfg_batch_edit.sory_by,
+                    cfg_batch_edit.sort_by,
                     cfg_batch_edit.sort_order,
                     cfg_batch_edit.sw_prefix,
                     cfg_batch_edit.sw_suffix,
@@ -129,7 +129,7 @@ class BatchEditCaptionsUI(UIBase):
 
     def set_callbacks(
         self,
-        o_update_filter_and_gallery: list[gr.components.Component],
+        o_update_filter_and_gallery: list[gr.Component],
         load_dataset: LoadDatasetUI,
         filter_by_tags: FilterByTagsUI,
         get_filters: Callable[[], list[dte_module.filters.Filter]],
@@ -139,10 +139,10 @@ class BatchEditCaptionsUI(UIBase):
             fn=lambda: ["", ""], outputs=[self.tb_common_tags, self.tb_edit_tags]
         )
 
-        def apply_edit_tags(search_tags: str, replace_tags: str, prepend: bool):
-            search_tags = [t.strip() for t in search_tags.split(",")]
+        def apply_edit_tags(search_tags_str: str, replace_tags_str: str, prepend: bool):
+            search_tags = [t.strip() for t in search_tags_str.split(",")]
             search_tags = [t for t in search_tags if t]
-            replace_tags = [t.strip() for t in replace_tags.split(",")]
+            replace_tags = [t.strip() for t in replace_tags_str.split(",")]
             replace_tags = [t for t in replace_tags if t]
 
             dte_instance.replace_tags(
@@ -307,9 +307,9 @@ class BatchEditCaptionsUI(UIBase):
             fn=remove_selected_tags, outputs=o_update_filter_and_gallery
         )
 
-        def sort_selected_tags(sort_by: str, sort_order: str):
-            sort_by = SortBy(sort_by)
-            sort_order = SortOrder(sort_order)
+        def sort_selected_tags(sort_by_str: str, sort_order_str: str):
+            sort_by = SortBy(sort_by_str)
+            sort_order = SortOrder(sort_order_str)
             dte_instance.sort_filtered_tags(
                 get_filters(), sort_by=sort_by, sort_order=sort_order
             )
@@ -319,11 +319,6 @@ class BatchEditCaptionsUI(UIBase):
             fn=sort_selected_tags,
             inputs=[self.rb_sort_by, self.rb_sort_order],
             outputs=o_update_filter_and_gallery,
-        )
-
-        self.cb_show_only_tags_selected.change(
-            fn=self.func_to_set_value("show_only_selected_tags"),
-            inputs=self.cb_show_only_tags_selected,
         )
 
         def truncate_by_token_count(token_count: int):

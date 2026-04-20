@@ -47,7 +47,7 @@ BatchEditConfig = namedtuple(
         "sw_prefix",
         "sw_suffix",
         "sw_regex",
-        "sory_by",
+        "sort_by",
         "sort_order",
         "batch_sort_by",
         "batch_sort_order",
