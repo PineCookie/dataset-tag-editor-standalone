@@ -10,6 +10,8 @@ from paths import paths
 class CustomScripts:
     def _load_module_from(self, path:Path):
         module_spec = importlib.util.spec_from_file_location(path.stem, path)
+        if module_spec is None or module_spec.loader is None:
+            raise ImportError(f"Cannot load module from path: {path}")
         module = importlib.util.module_from_spec(module_spec)
         module_spec.loader.exec_module(module)
         return module

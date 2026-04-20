@@ -5,7 +5,7 @@ class Filter:
     def apply(self, dataset):
         return dataset
 
-    def __str__(self):
+    def __str__(self) -> str:
         return ""
 
 
@@ -86,7 +86,7 @@ class PathFilter(Filter):
         INCLUSIVE = 1
         EXCLUSIVE = 2
 
-    def __init__(self, paths: set[str] = {}, mode: Mode = Mode.NONE):
+    def __init__(self, paths: set[str] = set(), mode: Mode = Mode.NONE):
         self.paths = paths
         self.mode = mode
 

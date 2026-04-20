@@ -52,7 +52,7 @@ class FilterBySelectionUI(UIBase):
 
     def set_callbacks(
         self,
-        o_update_filter_and_gallery: list[gr.components.Component],
+        o_update_filter_and_gallery: list[gr.Component],
         dataset_gallery: DatasetGalleryUI,
         filter_by_tags: FilterByTagsUI,
         get_filters: Callable[[], list[dte_module.filters.Filter]],

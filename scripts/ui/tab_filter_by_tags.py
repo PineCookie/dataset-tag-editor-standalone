@@ -68,17 +68,24 @@ class FilterByTagsUI(UIBase):
 
     def set_callbacks(
         self,
-        o_update_gallery: list[gr.components.Component],
+        o_update_gallery: list[gr.Component],
         batch_edit_captions: BatchEditCaptionsUI,
         move_or_delete_files: MoveOrDeleteFilesUI,
         update_gallery: Callable[[], list],
         get_filters: Callable[[], list[dte_module.filters.Filter]]
     ):
+        def get_tag_select_update():
+            """Safely get tag_select_ui_remove update, with fallback for errors."""
+            try:
+                return batch_edit_captions.tag_select_ui_remove.cbg_tags_update()
+            except Exception:
+                return gr.update(value=[], choices=[])
+        
         common_callback = (
             lambda: update_gallery()
             + batch_edit_captions.get_common_tags(get_filters, self)
             + [move_or_delete_files.update_current_move_or_delete_target_num()]
-            + [batch_edit_captions.tag_select_ui_remove.cbg_tags_update()]
+            + [get_tag_select_update()]
         )
 
         common_callback_output = (
@@ -89,13 +96,13 @@ class FilterByTagsUI(UIBase):
         )
 
         self.tag_filter_ui.after_filter_update(
-            fn=lambda: common_callback() + [", ".join(self.tag_filter_ui.filter.tags)],
+            fn=lambda _=None: common_callback() + [", ".join(self.tag_filter_ui.filter.tags)],
             inputs=None,
             outputs=common_callback_output + [batch_edit_captions.tb_sr_selected_tags]
         )
 
         self.tag_filter_ui_neg.after_filter_update(
-            fn=common_callback,
+            fn=lambda _=None: common_callback(),
             inputs=None,
             outputs=common_callback_output
         )
@@ -103,13 +110,14 @@ class FilterByTagsUI(UIBase):
         self.tag_filter_ui.set_callbacks()
         self.tag_filter_ui_neg.set_callbacks()
 
-        o_clear_filters = [self.tag_filter_ui.cbg_tags, self.tag_filter_ui.tb_search_tags] + [self.tag_filter_ui_neg.cbg_tags, self.tag_filter_ui_neg.tb_search_tags]
+        o_clear_filters = [self.tag_filter_ui.cbg_tags, self.tag_filter_ui.tb_search_tags] + \
+            [self.tag_filter_ui_neg.cbg_tags, self.tag_filter_ui_neg.tb_search_tags]
 
         self.btn_clear_tag_filters.click(
             fn=lambda: self.clear_filters(),
             outputs=o_clear_filters,
         ).then(
-            fn = lambda: common_callback(),
+            fn=lambda: common_callback(),
             inputs=None,
             outputs=common_callback_output
         )
@@ -118,13 +126,13 @@ class FilterByTagsUI(UIBase):
             fn=lambda: self.clear_filters(),
             outputs=o_clear_filters,
         ).then(
-            fn = lambda: common_callback(),
+            fn=lambda: common_callback(),
             inputs=None,
             outputs=common_callback_output
         )
 
     def clear_filters(self):
         return self.tag_filter_ui.clear_filter() + self.tag_filter_ui_neg.clear_filter()
-    
+
     def clear_filters_output(self):
         return self.tag_filter_ui.clear_filter_output() + self.tag_filter_ui_neg.clear_filter_output()

@@ -25,7 +25,7 @@ class Dataset:
         if type(dataset) is Dataset:
             for path in dataset.datas.keys():
                 if overwrite or path not in self.datas.keys():
-                    self.datas[path] = dataset[path]
+                    self.datas[path] = dataset.datas[path]
         return self
 
     def append_data(self, data: Data):

@@ -50,7 +50,7 @@ class MoveOrDeleteFilesUI(UIBase):
         self.btn_move_or_delete_delete_files = gr.Button(
             value="DELETE File(s)", variant="primary"
         )
-    
+
     def update_current_move_or_delete_target_num(self):
         if self.update_func:
             text = self.update_func(self.target_data)
@@ -60,12 +60,12 @@ class MoveOrDeleteFilesUI(UIBase):
 
     def set_callbacks(
         self,
-        o_update_filter_and_gallery: list[gr.components.Component],
+        o_update_filter_and_gallery: list[gr.Component],
         dataset_gallery: DatasetGalleryUI,
         get_filters: Callable[[], list[dte_module.filters.Filter]],
         update_filter_and_gallery: Callable[[], list],
     ):
-        def _get_current_move_or_delete_target_num(text:str):
+        def _get_current_move_or_delete_target_num(text: str):
             self.target_data = text
             if self.target_data == "Selected One":
                 self.current_target_txt = f"Target dataset num: {1 if dataset_gallery.selected_index != -1 else 0}"
@@ -76,7 +76,6 @@ class MoveOrDeleteFilesUI(UIBase):
                 self.current_target_txt = f"Target dataset num: 0"
             return self.current_target_txt
 
-        
         self.update_func = _get_current_move_or_delete_target_num
 
         self.update_args = {
@@ -127,7 +126,7 @@ class MoveOrDeleteFilesUI(UIBase):
                 img_path = dataset_gallery.selected_path
                 if img_path:
                     dte_instance.delete_dataset_file(
-                        img_path, delete_img, caption_ext, delete_txt, delete_bak
+                        img_path, caption_ext, delete_img, delete_txt, delete_bak
                     )
                     dte_instance.construct_tag_infos()
 
